@@ -7,3 +7,8 @@ debian/debhelper-build-stamp
 debian/files
 debian/*.substvars
 dist/
+.env*
+*.key
+*.pem
+!app/roots/*.pem
+secrets/
