@@ -1,0 +1,12 @@
+[project]
+name = "signfield"
+version = "0.1.0"
+description = "Local validator for CCA India-signed PDFs"
+requires-python = ">=3.11"
+dependencies = [
+    "pyhanko>=0.25",
+    "pyhanko-certvalidator>=0.26",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "python-multipart>=0.0.9",
+]

@@ -1,0 +1,88 @@
+#!/usr/bin/python3
+"""SignField desktop launcher: serves the app on a private localhost port
+and shows it in a Qt WebEngine window."""
+
+import os
+import socket
+import sys
+import threading
+import time
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+# Installed: /usr/lib/signfield/{vendor,app}. Checkout: ./app (vendor absent).
+sys.path[:0] = [os.path.join(HERE, "vendor"), os.path.join(HERE, "app")]
+
+import uvicorn  # noqa: E402
+from PyQt6.QtCore import QStandardPaths, QUrl  # noqa: E402
+from PyQt6.QtGui import QColor, QIcon  # noqa: E402
+from PyQt6.QtWebEngineCore import QWebEngineDownloadRequest, QWebEngineSettings  # noqa: E402
+from PyQt6.QtWebEngineWidgets import QWebEngineView  # noqa: E402
+from PyQt6.QtWidgets import QApplication, QMainWindow  # noqa: E402
+
+import server  # noqa: E402
+
+APP_ID = "io.thallium.SignField"
+
+
+def free_port() -> int:
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def unique_path(directory: str, name: str) -> str:
+    stem, ext = os.path.splitext(name)
+    path, n = os.path.join(directory, name), 1
+    while os.path.exists(path):
+        path = os.path.join(directory, f"{stem} ({n}){ext}")
+        n += 1
+    return path
+
+
+def on_download(req: QWebEngineDownloadRequest) -> None:
+    target = unique_path(
+        QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DownloadLocation),
+        req.downloadFileName(),
+    )
+    req.setDownloadDirectory(os.path.dirname(target))
+    req.setDownloadFileName(os.path.basename(target))
+    req.accept()
+
+
+def main() -> int:
+    port = free_port()
+    srv = uvicorn.Server(uvicorn.Config(server.app, host="127.0.0.1", port=port, log_level="warning"))
+    threading.Thread(target=srv.run, daemon=True).start()
+    deadline = time.monotonic() + 15
+    while not srv.started:
+        if time.monotonic() > deadline:
+            print("signfield: server did not start", file=sys.stderr)
+            return 1
+        time.sleep(0.05)
+
+    app = QApplication(sys.argv)
+    app.setApplicationName("SignField")
+    app.setDesktopFileName(APP_ID)
+    app.setWindowIcon(QIcon.fromTheme(APP_ID))
+
+    view = QWebEngineView()
+    settings = view.settings()
+    settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, True)
+    settings.setAttribute(QWebEngineSettings.WebAttribute.PdfViewerEnabled, True)
+    view.page().profile().downloadRequested.connect(on_download)
+    view.page().setBackgroundColor(QColor("#1e2326"))
+    view.load(QUrl(f"http://127.0.0.1:{port}/"))
+
+    win = QMainWindow()
+    win.setWindowTitle("SignField")
+    win.setCentralWidget(view)
+    win.resize(1320, 880)
+    win.show()
+
+    rc = app.exec()
+    srv.should_exit = True
+    return rc
+
+
+if __name__ == "__main__":
+    sys.exit(main())

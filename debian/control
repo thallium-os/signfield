@@ -1,0 +1,23 @@
+Source: signfield
+Section: utils
+Priority: optional
+Maintainer: Thallium Project <36neelansh@gmail.com>
+Build-Depends: debhelper-compat (= 13), python3, python3-pip
+Standards-Version: 4.6.2
+Homepage: https://github.com/thallium-os/signfield
+
+Package: signfield
+# Vendored wheels include CPython 3.13 extension modules (pydantic-core,
+# lxml, aiohttp), so the package is tied to this arch and Python minor.
+Architecture: amd64
+Depends: ${misc:Depends}, libc6, python3 (>= 3.13~), python3 (<< 3.14~),
+ python3-pyqt6, python3-pyqt6.qtwebengine
+Description: Validator for digitally signed Indian government PDFs
+ SignField checks PDF signatures made under the CCA India PKI (e-Aadhaar,
+ e-PAN, DigiLocker, GST, DSC-signed documents): integrity, coverage, the
+ certificate chain to a CCA India root, validity at signing time and
+ revocation. For a valid file it builds a flattened display copy in which
+ the "validity unknown" mark becomes a green tick.
+ .
+ pyHanko and its dependencies are vendored: Debian 13 ships cryptography 43,
+ and pyHanko 0.37 needs 48 or newer.

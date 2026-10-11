@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=SignField
+GenericName=PDF Signature Validator
+Comment=Validate digitally signed Indian government PDFs and download a verified copy
+Exec=signfield
+Icon=io.thallium.SignField
+Terminal=false
+Categories=Office;Utility;
+Keywords=pdf;signature;aadhaar;dsc;verify;cca;
+MimeType=application/pdf;
+StartupNotify=true
+StartupWMClass=io.thallium.SignField

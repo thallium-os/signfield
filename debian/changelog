@@ -1,0 +1,6 @@
+signfield (0.1.0-1) unstable; urgency=medium
+
+  * Initial release: CCA India PDF signature validation with a verified
+    display copy, in a Qt WebEngine window.
+
+ -- Thallium Project <36neelansh@gmail.com>  Sun, 11 Oct 2026 14:08:19 +0530

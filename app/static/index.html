@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SignField</title>
+<style>
+/* Thallium81 tokens (Everforest dark), from thallium-store-qt/web/style.css */
+:root {
+  --base: #1e2326; --panel: #272e33; --panel-2: #2e383c; --line: #414b50;
+  --fg: #d3c6aa; --muted: #9da9a0; --green: #a7c080; --aqua: #83c092;
+  --yellow: #dbbc7f; --red: #e67e80;
+  --shadow: 0 22px 60px rgb(0 0 0 / 0.32);
+  --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+  --slab: linear-gradient(145deg, rgb(46 56 60 / .95), rgb(39 46 51 / .94));
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--fg); background: var(--base);
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0; min-height: 100vh; display: flex; flex-direction: column; font-size: 15px; line-height: 1.5;
+  background:
+    radial-gradient(circle at 12% -8%, rgb(167 192 128 / 0.14), transparent 34rem),
+    radial-gradient(circle at 100% 20%, rgb(127 187 179 / 0.1), transparent 30rem),
+    var(--base);
+}
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 28px; min-height: 70px;
+  padding: 12px clamp(16px, 4vw, 48px); background: rgb(39 46 51 / 0.94);
+  border-bottom: 1px solid var(--line); backdrop-filter: blur(18px);
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-mark {
+  display: grid; place-items: center; width: 38px; height: 38px; color: var(--base); background: var(--green);
+  font-weight: 900; font-size: 19px; clip-path: polygon(0 0, 83% 0, 100% 17%, 100% 100%, 17% 100%, 0 83%);
+}
+.brand strong, .brand small { display: block; }
+.brand strong { font-size: 17px; line-height: 1; }
+.brand small { margin-top: 4px; color: var(--muted); font-size: 8px; letter-spacing: .28em; }
+.topbar .status { margin-left: auto; color: var(--muted); font: 700 11px var(--mono); letter-spacing: .14em; }
+.topbar .status::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 8px; background: var(--green); }
+
+main { width: min(1440px, 100%); margin: 0 auto; padding: 40px clamp(16px, 4vw, 48px) 72px; flex: 1; }
+.layout { display: grid; gap: 28px; }
+.layout.has-preview { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
+footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; padding: 16px clamp(16px, 4vw, 48px);
+  border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+
+.eyebrow { color: var(--green); font: 700 11px var(--mono); letter-spacing: .2em; }
+h1 { margin: 6px 0 8px; font-size: clamp(28px, 4.4vw, 44px); letter-spacing: -.035em; line-height: 1.1; }
+.sub { margin: 0 0 24px; color: var(--muted); max-width: 60ch; }
+
+/* Drop target: large (Fitts), and the whole window accepts drops (Postel). */
+#drop {
+  display: grid; place-items: center; gap: 6px; min-height: 160px; padding: 32px 20px; text-align: center; cursor: pointer;
+  border: 1px dashed var(--line); background: var(--slab); box-shadow: 0 10px 30px rgb(0 0 0 / .1);
+  transition: border-color 150ms ease, background 150ms ease;
+}
+#drop:hover, #drop:focus-visible, body.dragging #drop { border-color: var(--green); background: var(--panel-2); outline: 0; }
+body.dragging #drop { box-shadow: 0 0 0 3px rgb(167 192 128 / .18); }
+#drop .plus { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--green); color: var(--green); font-size: 22px; line-height: 1; }
+#drop b { font-size: 17px; }
+#drop span { color: var(--muted); font: 700 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.compact #drop { min-height: 0; padding: 18px; grid-auto-flow: column; gap: 14px; }
+.compact #drop span { display: none; }
+.compact h1, .compact .sub, .compact .eyebrow { display: none; }
+
+/* Batch summary + progress (goal-gradient, Doherty). */
+.bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 24px 0 12px; }
+.bar .grow { flex: 1; min-width: 180px; color: var(--muted); font: 700 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.progress { height: 3px; margin: 0 0 14px; background: var(--panel); overflow: hidden; }
+.progress span { display: block; height: 100%; width: 0; background: var(--green); transition: width 300ms ease; }
+
+button { min-height: 40px; padding: 8px 14px; border: 1px solid var(--line); background: transparent; cursor: pointer; font-weight: 750; }
+button:hover { border-color: var(--green); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { border-color: var(--green); color: var(--base); background: var(--green); }
+button.quiet { min-height: 32px; padding: 4px 10px; color: var(--muted); font-size: 13px; font-weight: 600; }
+button.quiet:hover { color: var(--fg); }
+
+#results { display: grid; gap: 10px; }
+.card { border: 1px solid var(--line); background: var(--slab); box-shadow: 0 10px 30px rgb(0 0 0 / .1); transition: border-color 150ms ease; }
+.card.selected { border-color: var(--green); box-shadow: inset 3px 0 0 var(--green), 0 10px 30px rgb(0 0 0 / .1); }
+.head { display: flex; gap: 14px; align-items: center; width: 100%; min-height: 56px; padding: 12px 18px; border: 0; text-align: left; font-weight: 400; }
+.head .name { flex: 1; min-width: 0; overflow-wrap: anywhere; font-weight: 700; }
+.head .size { color: var(--muted); font: 12px var(--mono); }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid currentColor; font: 700 10px var(--mono);
+  letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.valid { color: var(--green); }
+.unknown, .pending, .unsigned, .locked { color: var(--yellow); }
+.invalid, .error { color: var(--red); }
+.spin { width: 10px; height: 10px; border: 2px solid var(--line); border-top-color: currentColor; border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Verdict line: the one thing that differs from everything else (Von Restorff). */
+.verdict { display: flex; gap: 12px; align-items: flex-start; margin: 0 18px; padding: 12px 14px; border-left: 3px solid currentColor; background: rgb(30 35 38 / .6); }
+.verdict .big { display: grid; place-items: center; width: 26px; height: 26px; flex: none; color: var(--base); background: currentColor; font-weight: 900; }
+.verdict .big i { font-style: normal; color: var(--base); }
+.verdict strong { display: block; color: var(--fg); }
+.verdict p { margin: 2px 0 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 18px 16px; }
+.actions .hint { flex-basis: 100%; color: var(--muted); font-size: 12px; }
+
+details.more { margin: 0 18px 16px; border-top: 1px solid var(--line); }
+details.more > summary { padding: 10px 0; cursor: pointer; color: var(--muted); font: 700 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+details.more > summary:hover { color: var(--fg); }
+.meta { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.mono { font-family: var(--mono); font-size: 12px; }
+h3 { margin: 18px 0 8px; color: var(--aqua); font: 700 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+ul { list-style: none; padding: 0; margin: 0; }
+.checks li { display: flex; gap: 12px; padding: 7px 0; border-bottom: 1px solid rgb(65 75 80 / .5); font-size: 14px; }
+.checks li:last-child { border-bottom: 0; }
+.checks .ic { display: grid; place-items: center; width: 20px; height: 20px; flex: none; font-size: 12px; font-weight: 900; color: var(--base); }
+.checks .pass .ic { background: var(--green); } .checks .note .ic { background: var(--yellow); } .checks .fail .ic { background: var(--red); }
+.chain li { position: relative; padding: 4px 0 10px 18px; border-left: 1px solid var(--line); font-size: 14px; }
+.chain li::before { content: ""; position: absolute; left: -4px; top: 11px; width: 7px; height: 7px; background: var(--line); }
+.chain li:last-child { border-color: transparent; }
+.chain li:last-child::before { background: var(--green); }
+.pw { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 18px 16px; }
+.pw input { min-width: 0; flex: 1; max-width: 300px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--line); outline: 0; background: var(--base); }
+.pw input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgb(167 192 128 / .12); }
+
+/* Preview pane: sticky column on wide screens, full-screen sheet on narrow ones. */
+#preview { position: sticky; top: 94px; display: flex; flex-direction: column; height: calc(100vh - 118px); min-height: 420px;
+  border: 1px solid var(--line); background: var(--panel); box-shadow: var(--shadow); }
+.pv-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.pv-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.tabs { display: flex; border: 1px solid var(--line); }
+.tabs button { min-height: 32px; padding: 4px 12px; border: 0; color: var(--muted); font-size: 13px; }
+.tabs button[aria-selected="true"] { color: var(--base); background: var(--green); }
+.pv-close { min-height: 32px; width: 32px; padding: 0; font-size: 18px; }
+.pv-body { position: relative; flex: 1; background: var(--base); }
+.pv-body iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.pv-msg { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; padding: 24px; text-align: center; color: var(--muted); }
+.pv-msg .spin { width: 28px; height: 28px; border-width: 3px; }
+.pv-foot { padding: 8px 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+
+details.roots { margin-top: 40px; border-top: 1px solid var(--line); padding-top: 14px; color: var(--muted); }
+details.roots summary { cursor: pointer; color: var(--fg); font: 700 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+details.roots li { padding: 3px 0; font-size: 13px; }
+
+@media (max-width: 1100px) {
+  .layout.has-preview { grid-template-columns: 1fr; }
+  #preview { position: fixed; inset: 0; z-index: 20; height: auto; min-height: 0; border: 0; }
+}
+@media (max-width: 620px) { .topbar .status { display: none; } .head .size { display: none; } }
+
+/* ---- Motion: one easing curve, short durations, nothing replays on re-render. ---- */
+:root { --ease: cubic-bezier(.2, .8, .2, 1); --spring: cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+@keyframes fade { from { opacity: 0; } }
+@keyframes pop { 0% { transform: scale(.4); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes slide-in { from { opacity: 0; transform: translateX(24px); } }
+@keyframes sheet-up { from { transform: translateY(100%); } }
+@keyframes shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+@keyframes breathe { 50% { box-shadow: 0 0 0 6px rgb(167 192 128 / .08); } }
+
+main > .layout > section > * { animation: rise .5s var(--ease) both; }
+main > .layout > section > :nth-child(2) { animation-delay: .04s; }
+main > .layout > section > :nth-child(3) { animation-delay: .08s; }
+main > .layout > section > :nth-child(4) { animation-delay: .12s; }
+
+.card.enter { animation: rise .42s var(--ease) both; }
+.card { transition: border-color .2s var(--ease), box-shadow .25s var(--ease), transform .2s var(--ease); }
+.card:not(.selected):hover { transform: translateY(-2px); border-color: rgb(167 192 128 / .5); }
+.card.pending-card .head { background: linear-gradient(90deg, transparent, rgb(167 192 128 / .07), transparent) 0 0 / 200% 100%;
+  animation: shimmer 1.6s linear infinite; }
+.verdict.reveal { animation: rise .38s var(--ease) both; }
+.verdict.reveal .big { animation: pop .45s var(--spring) .1s both; }
+.actions.reveal, .pw.reveal { animation: fade .4s var(--ease) .12s both; }
+.pill { transition: color .25s var(--ease), border-color .25s var(--ease); }
+
+button { transition: border-color .15s var(--ease), background .15s var(--ease), color .15s var(--ease), transform .12s var(--ease), box-shadow .2s var(--ease); }
+button:active:not(:disabled) { transform: scale(.97); }
+button.primary:hover:not(:disabled) { box-shadow: 0 6px 18px rgb(167 192 128 / .22); }
+.head { transition: background .2s var(--ease); }
+.head:hover { background: rgb(167 192 128 / .04); }
+
+#drop { transition: border-color .2s var(--ease), background .2s var(--ease), transform .25s var(--ease), box-shadow .3s var(--ease), min-height .35s var(--ease), padding .35s var(--ease); }
+#drop .plus { transition: transform .3s var(--spring), background .2s var(--ease), color .2s var(--ease); }
+#drop:hover .plus { transform: rotate(90deg); }
+body.dragging #drop { transform: scale(1.01); animation: breathe 1.2s var(--ease) infinite; }
+body.dragging #drop .plus { transform: scale(1.15); background: var(--green); color: var(--base); }
+
+.progress span { transition: width .45s var(--ease); }
+details.more[open] > :not(summary), details.roots[open] > :not(summary) { animation: rise .3s var(--ease) both; }
+details.more > summary::before, details.roots summary::before { content: "▸"; display: inline-block; margin-right: 8px; transition: transform .2s var(--ease); }
+details[open] > summary::before { transform: rotate(90deg); }
+details > summary { list-style: none; } details > summary::-webkit-details-marker { display: none; }
+.checks li { animation: fade .3s var(--ease) both; }
+.checks li:nth-child(2) { animation-delay: .03s; } .checks li:nth-child(3) { animation-delay: .06s; }
+.checks li:nth-child(4) { animation-delay: .09s; } .checks li:nth-child(5) { animation-delay: .12s; }
+.checks li:nth-child(n+6) { animation-delay: .15s; }
+
+#preview.enter { animation: slide-in .4s var(--ease) both; }
+.pv-body iframe { opacity: 0; transition: opacity .3s var(--ease); }
+.pv-body iframe.loaded { opacity: 1; }
+.pv-msg { animation: fade .25s var(--ease) both; }
+.tabs button { transition: background .2s var(--ease), color .2s var(--ease); }
+@media (max-width: 1100px) { #preview.enter { animation: sheet-up .38s var(--ease) both; } }
+@media (prefers-reduced-motion: reduce) { * { transition-duration: .01ms !important; animation-duration: .01ms !important; } }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">S</span><div><strong>SignField</strong><small>LOCAL · CCA INDIA</small></div></div>
+  <span class="status">OFFLINE-FIRST</span>
+</header>
+<main>
+  <div class="layout" id="layout">
+    <section id="left">
+      <div class="eyebrow">PDF SIGNATURE VALIDATOR</div>
+      <h1>Validate Indian government PDF signatures</h1>
+      <p class="sub">Drop a signed PDF to check its integrity, CCA India certificate chain and revocation, then download a
+        copy where the “?” becomes a green tick. Files stay on this machine.</p>
+
+      <div id="drop" tabindex="0" role="button" aria-label="Add PDFs">
+        <div class="plus" aria-hidden="true">+</div>
+        <b>Drop PDFs anywhere, click to choose, or paste</b>
+        <span>Up to 25 MB each · batch · password-protected OK</span>
+        <input id="pick" type="file" accept="application/pdf,.pdf" multiple hidden>
+      </div>
+
+      <div class="bar" id="bar" hidden>
+        <div class="grow" id="count" aria-live="polite"></div>
+        <button class="quiet" id="csv">CSV</button>
+        <button class="quiet" id="json">JSON</button>
+        <button class="quiet" id="clear">Clear all</button>
+      </div>
+      <div class="progress" id="progress" hidden><span></span></div>
+
+      <div id="results"></div>
+
+      <details class="roots">
+        <summary>Trusted roots</summary>
+        <ul id="roots"></ul>
+      </details>
+    </section>
+
+    <aside id="preview" hidden aria-label="Preview">
+      <div class="pv-head">
+        <span class="pv-title" id="pv-title"></span>
+        <div class="tabs" role="tablist">
+          <button role="tab" data-view="original" aria-selected="true">Original</button>
+          <button role="tab" data-view="copy" aria-selected="false">Verified copy</button>
+        </div>
+        <button class="pv-close" id="pv-close" aria-label="Close preview (Esc)">×</button>
+      </div>
+      <div class="pv-body" id="pv-body"></div>
+      <div class="pv-foot" id="pv-foot"></div>
+    </aside>
+  </div>
+</main>
+<footer><span>SignField · pyHanko</span><span>Verified copies are not digitally signed; the original PDF is the legal record.</span></footer>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const results = []; // {file, card, data, status, password, copyUrl, origUrl}
+let queue = Promise.resolve();
+let selected = null, view = "original";
+
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const LABEL = { valid: "Valid", invalid: "Invalid", unknown: "Unknown", unsigned: "Not signed",
+  pending: "Checking", error: "Error", locked: "Locked" };
+const ICON = { pass: "✓", note: "!", fail: "✗" };
+const kb = (n) => n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+const fmtDate = (s) => s ? new Date(s).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "";
+
+function addFiles(files) {
+  const added = [];
+  for (const f of files) {
+    if (!/\.pdf$/i.test(f.name) && f.type !== "application/pdf") continue;
+    const r = { file: f, status: "pending", data: null, card: document.createElement("article") };
+    r.card.className = "card enter";
+    r.card.addEventListener("animationend", () => r.card.classList.remove("enter"), { once: true });
+    results.push(r); added.push(r);
+    $("#results").append(r.card);
+    render(r);
+    queue = queue.then(() => run(r));
+  }
+  if (!added.length) return;
+  $("#left").classList.add("compact");
+  if (!selected) select(added[0]);
+  updateCount();
+}
+
+async function run(r, password = "") {
+  r.password = password; r.copyUrl = null; r.origUrl = null;
+  r.status = "pending"; render(r); updateCount();
+  const fd = new FormData();
+  fd.append("file", r.file);
+  fd.append("password", password);
+  try {
+    const res = await fetch("/api/validate", { method: "POST", body: fd });
+    const body = await res.json();
+    if (res.status === 401) { r.status = "locked"; r.error = body.detail; }
+    else if (!res.ok) { r.status = "error"; r.error = body.detail; }
+    else { r.data = body; r.status = body.verdict; }
+  } catch (e) { r.status = "error"; r.error = String(e); }
+  render(r); updateCount();
+  if (r === selected) {
+    // Peak-end: a valid file lands straight on its verified copy.
+    if (r.status === "valid") view = "copy";
+    showPreview();
+  }
+  if (r.status === "locked" && r === selected) r.card.querySelector(".pw input")?.focus();
+}
+
+function summary(r) {
+  const s = r.data?.signatures?.[0];
+  const firstIssue = (st) => r.data.signatures.flatMap((x) => x.error ? [{ detail: x.error }] : x.checks).find((c) => c.status === st || (!c.status && st === "fail"));
+  switch (r.status) {
+    case "valid": return ["✓", "Signature valid", `Signed by ${s.signer}${s.signed_at ? " · " + fmtDate(s.signed_at) : ""}`];
+    case "invalid": return ["✗", "Signature invalid", firstIssue("fail")?.detail ?? "A check failed."];
+    case "unknown": return ["!", "Validity unknown", firstIssue("note")?.detail ?? "Some checks could not be confirmed."];
+    case "unsigned": return ["!", "No digital signature", "This PDF does not contain a signature to check."];
+    case "locked": return ["!", "Password needed", r.error];
+    case "error": return ["✗", "Could not check this file", r.error];
+    default: return null;
+  }
+}
+
+function render(r) {
+  const d = r.data, sum = summary(r);
+  const changed = r.painted !== r.status;
+  r.painted = r.status;
+  const rv = changed ? " reveal" : "";
+  let html = `<button class="head" aria-expanded="${r === selected}">
+      <span class="name">${esc(r.file.name)}</span><span class="size">${kb(r.file.size)}</span>
+      <span class="pill ${r.status}">${r.status === "pending" ? '<span class="spin"></span>' : ""}${LABEL[r.status]}</span></button>`;
+  if (sum) html += `<div class="verdict ${r.status}${rv}"><span class="big"><i>${sum[0]}</i></span>
+      <div><strong>${sum[1]}</strong><p>${esc(sum[2])}</p></div></div>`;
+  if (r.status === "locked") {
+    html += `<form class="pw${rv}" style="margin-top:12px"><input type="password" placeholder="PDF password" aria-label="PDF password" required>
+      <button class="primary">Unlock</button></form>`;
+  } else if (sum) {
+    // Hick: one primary action; preview is secondary.
+    html += `<div class="actions${rv}">${r.status === "valid" ? '<button class="primary dl">Download verified copy</button>' : ""}
+      <button class="pv">${r === selected ? "Showing in preview" : "Preview"}</button>
+      ${r.status === "valid" ? '<span class="hint">Flattened copy with a green tick. Not digitally signed.</span>' : ""}</div>`;
+  }
+  if (d?.signatures?.length) {
+    // Miller: details are chunked and disclosed on demand.
+    html += `<details class="more"><summary>What was checked</summary>`;
+    for (const s of d.signatures) {
+      html += `<h3>${esc(s.field)} · ${esc(s.doc_type || "")}</h3>`;
+      if (s.error) html += `<p class="meta">${esc(s.error)}</p>`;
+      html += `<ul class="checks">${s.checks.map((c) =>
+        `<li class="${c.status}"><span class="ic">${ICON[c.status]}</span><span><b>${esc(c.label)}</b> — ${esc(c.detail)}</span></li>`).join("")}</ul>`;
+      if (s.chain.length) html += `<h3>Who vouches for whom</h3><ul class="chain">${s.chain.map((c) =>
+        `<li>${esc(c.subject)}<div class="meta">${c.not_before.slice(0, 10)} → ${c.not_after.slice(0, 10)}</div></li>`).join("")}</ul>`;
+    }
+    html += `<p class="meta mono" style="margin-top:14px">SHA-256 ${d.sha256}</p></details>`;
+  }
+  r.card.innerHTML = html;
+  r.card.classList.toggle("selected", r === selected);
+  r.card.classList.toggle("pending-card", r.status === "pending");
+  r.card.querySelector(".head").onclick = () => select(r);
+  r.card.querySelector(".pv")?.addEventListener("click", () => select(r, true));
+  r.card.querySelector(".dl")?.addEventListener("click", (e) => downloadCopy(r, e.currentTarget));
+  const form = r.card.querySelector("form");
+  if (form) form.onsubmit = (e) => { e.preventDefault(); queue = queue.then(() => run(r, form.querySelector("input").value)); };
+}
+
+function select(r, forceOpen = false) {
+  const prev = selected;
+  selected = r;
+  view = r.status === "valid" ? "copy" : "original";
+  if (prev && prev !== r) render(prev);
+  render(r);
+  if (forceOpen || window.innerWidth > 1100) showPreview();
+}
+
+// Hide the viewer's own toolbar: the card's button is the one download control.
+const VIEWER = "#toolbar=0&navpanes=0&view=FitH";
+
+async function getOriginal(r) {
+  if (r.origUrl) return r.origUrl;
+  if (!r.password) return (r.origUrl = URL.createObjectURL(r.file));
+  // Encrypted: preview a decrypted copy so the viewer doesn't prompt again.
+  const fd = new FormData();
+  fd.append("file", r.file);
+  fd.append("password", r.password);
+  const res = await fetch("/api/original", { method: "POST", body: fd });
+  if (!res.ok) throw new Error((await res.json()).detail);
+  return (r.origUrl = URL.createObjectURL(await res.blob()));
+}
+
+async function getCopy(r) {
+  if (r.copyUrl) return r.copyUrl;
+  const fd = new FormData();
+  fd.append("file", r.file);
+  fd.append("password", r.password || "");
+  const res = await fetch("/api/display-copy", { method: "POST", body: fd });
+  if (!res.ok) throw new Error((await res.json()).detail);
+  r.copyUrl = URL.createObjectURL(await res.blob());
+  return r.copyUrl;
+}
+
+async function showPreview() {
+  const r = selected, pane = $("#preview");
+  if (!r) return;
+  if (pane.hidden) {
+    pane.hidden = false;
+    pane.classList.add("enter");
+    pane.addEventListener("animationend", () => pane.classList.remove("enter"), { once: true });
+  }
+  $("#layout").classList.add("has-preview");
+  $("#pv-title").textContent = r.file.name;
+  const canCopy = r.status === "valid";
+  if (!canCopy) view = "original";
+  for (const b of pane.querySelectorAll(".tabs button")) {
+    b.setAttribute("aria-selected", String(b.dataset.view === view));
+    if (b.dataset.view === "copy") b.disabled = !canCopy;
+  }
+  const body = $("#pv-body"), foot = $("#pv-foot");
+  const msg = (html) => { body.innerHTML = `<div class="pv-msg">${html}</div>`; };
+  if (view === "original") {
+    if (r.status === "locked" || r.status === "pending") {
+      msg(r.status === "locked" ? "Password-protected.<br>Enter the password in the card to preview it." : '<span class="spin"></span>Checking…');
+      foot.textContent = "";
+      return;
+    }
+    foot.textContent = canCopy ? "Original, as signed. Switch to “Verified copy” to see the green tick." : "Original, as uploaded.";
+    try {
+      const url = await getOriginal(r);
+      if (selected === r && view === "original") body.innerHTML = `<iframe onload="this.classList.add('loaded')" title="Original PDF" src="${url}${VIEWER}"></iframe>`;
+    } catch (e) { msg(`Could not open this PDF.<br>${esc(e.message)}`); }
+    return;
+  }
+  msg('<span class="spin"></span>Building verified copy…');
+  foot.textContent = "Flattened copy · not digitally signed · original SHA-256 in its properties.";
+  try {
+    const url = await getCopy(r);
+    if (selected === r && view === "copy") body.innerHTML = `<iframe onload="this.classList.add('loaded')" title="Verified copy" src="${url}${VIEWER}"></iframe>`;
+  } catch (e) { msg(`Could not build the copy.<br>${esc(e.message)}`); }
+}
+
+function closePreview() {
+  $("#preview").hidden = true;
+  $("#layout").classList.remove("has-preview");
+}
+
+for (const b of document.querySelectorAll(".tabs button")) b.onclick = () => { view = b.dataset.view; showPreview(); };
+$("#pv-close").onclick = closePreview;
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#preview").hidden) closePreview(); });
+
+async function downloadCopy(r, btn) {
+  btn.disabled = true; btn.textContent = "Building…";
+  try {
+    const a = document.createElement("a");
+    a.href = await getCopy(r);
+    a.download = r.file.name.replace(/\.pdf$/i, "") + "-verified.pdf";
+    a.click();
+    btn.textContent = "Downloaded ✓";
+    setTimeout(() => { btn.textContent = "Download verified copy"; }, 2000);
+  } catch (e) { btn.textContent = "Failed: " + e.message; }
+  btn.disabled = false;
+}
+
+function updateCount() {
+  const n = (s) => results.filter((r) => r.status === s).length;
+  const done = results.length - n("pending");
+  $("#bar").hidden = !results.length;
+  const parts = [`${done}/${results.length} checked`];
+  for (const [s, l] of [["valid", "valid"], ["invalid", "invalid"], ["unknown", "unknown"], ["locked", "locked"]]) if (n(s)) parts.push(`${n(s)} ${l}`);
+  $("#count").textContent = parts.join(" · ");
+  const prog = $("#progress");
+  prog.hidden = done === results.length;
+  prog.firstElementChild.style.width = results.length ? (100 * done / results.length) + "%" : "0";
+}
+
+function download(name, text, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+}
+
+$("#json").onclick = () => download("signfield-report.json",
+  JSON.stringify(results.map((r) => r.data ?? { filename: r.file.name, verdict: r.status, error: r.error }), null, 2), "application/json");
+
+$("#csv").onclick = () => {
+  const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const rows = [["file", "verdict", "sha256", "signer", "signed_at", "doc_type", "root", "notes"]];
+  for (const r of results) {
+    const sigs = r.data?.signatures?.length ? r.data.signatures : [{}];
+    for (const s of sigs) rows.push([r.file.name, r.data?.verdict ?? r.status, r.data?.sha256, s.signer, s.signed_at, s.doc_type,
+      s.chain?.at(-1)?.subject, (s.checks ?? []).filter((c) => c.status !== "pass").map((c) => c.label + ": " + c.detail).join("; ") || r.error]);
+  }
+  download("signfield-report.csv", rows.map((r) => r.map(q).join(",")).join("\n"), "text/csv");
+};
+
+$("#clear").onclick = () => {
+  if (results.length > 1 && !confirm(`Remove all ${results.length} results?`)) return;
+  for (const r of results) { if (r.copyUrl) URL.revokeObjectURL(r.copyUrl); if (r.origUrl) URL.revokeObjectURL(r.origUrl); }
+  results.length = 0; selected = null;
+  $("#results").innerHTML = "";
+  $("#left").classList.remove("compact");
+  closePreview(); updateCount();
+};
+
+const drop = $("#drop");
+drop.onclick = () => $("#pick").click();
+drop.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("#pick").click(); } };
+$("#pick").onchange = (e) => { addFiles(e.target.files); e.target.value = ""; };
+// The whole window is a drop target.
+let dragDepth = 0;
+const hasFiles = (e) => [...(e.dataTransfer?.types ?? [])].includes("Files");
+window.addEventListener("dragenter", (e) => { if (hasFiles(e)) { dragDepth++; document.body.classList.add("dragging"); } });
+window.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove("dragging"); } });
+window.addEventListener("dragover", (e) => { if (hasFiles(e)) e.preventDefault(); });
+window.addEventListener("drop", (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault(); dragDepth = 0; document.body.classList.remove("dragging");
+  addFiles(e.dataTransfer.files);
+});
+document.onpaste = (e) => addFiles(e.clipboardData.files);
+
+fetch("/api/roots").then((r) => r.json()).then((roots) => {
+  $("#roots").innerHTML = roots.map((c) => `<li>${esc(c.subject)} — valid until ${c.not_after.slice(0, 10)}</li>`).join("");
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+#!/usr/bin/make -f
+
+LIB := debian/signfield/usr/lib/signfield
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	# nothing to build; dependencies are vendored at install time
+
+override_dh_auto_test:
+	# no tests
+
+override_dh_auto_install:
+	install -d $(LIB)/app
+	cp -r app/server.py app/display.py app/static app/roots $(LIB)/app/
+	install -m 0755 signfield $(LIB)/signfield
+	python3 -m pip install --no-cache-dir --disable-pip-version-check --break-system-packages \
+	    --only-binary=:all: --target $(LIB)/vendor -r requirements.txt
+	rm -rf $(LIB)/vendor/bin
+	find $(LIB) -name __pycache__ -prune -exec rm -rf {} +
+	install -d debian/signfield/usr/bin
+	ln -s ../lib/signfield/signfield debian/signfield/usr/bin/signfield
+	install -Dm0644 data/io.thallium.SignField.desktop \
+	    debian/signfield/usr/share/applications/io.thallium.SignField.desktop
+	install -Dm0644 data/io.thallium.SignField.svg \
+	    debian/signfield/usr/share/icons/hicolor/scalable/apps/io.thallium.SignField.svg
+
+# Vendored manylinux wheels carry their own stripped modules and bundled
+# libraries (e.g. lxml.libs) that dpkg-shlibdeps cannot resolve.
+override_dh_strip override_dh_dwz:
+
+override_dh_shlibdeps:
+	dh_shlibdeps -Xusr/lib/signfield/vendor

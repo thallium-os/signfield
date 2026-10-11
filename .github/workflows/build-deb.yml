@@ -1,0 +1,19 @@
+name: build-deb
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  deb:
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    steps:
+      - run: apt-get update && apt-get install -y --no-install-recommends build-essential debhelper python3 python3-pip git ca-certificates
+      - uses: actions/checkout@v4
+      - run: dpkg-buildpackage -us -uc -b
+      - run: mkdir dist && mv ../signfield_*.deb dist/ && dpkg-deb -I dist/*.deb && dpkg-deb -c dist/*.deb | head -40
+      - uses: actions/upload-artifact@v4
+        with: { name: signfield-deb, path: dist/*.deb }
