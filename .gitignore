@@ -13,3 +13,4 @@ dist/
 !app/roots/*.pem
 secrets/
 _site/
+.wrangler/
