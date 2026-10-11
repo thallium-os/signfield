@@ -18,13 +18,14 @@
 ## Quick Start
 
 ```sh
-sudo apt install ./signfield_0.1.0-1_amd64.deb   # from the build-deb CI artifact
+curl -fsSL https://signfield.thallium81.dev/install.sh | sh   # Debian 13, amd64
 signfield
 ```
 
 ## Installation
 
 - **CI:** `.github/workflows/build-deb.yml` builds the `.deb` in `debian:trixie` on every push.
+- **Site + APT archive:** a `v*` tag runs `publish-site.yml`, which builds the `.deb`, signs a trixie archive (`scripts/build-site`) and deploys https://signfield.thallium81.dev as Worker static assets. Needs repo secrets `APT_SIGNING_KEY_B64` and `CLOUDFLARE_API_TOKEN`. Local deploy: `scripts/build-site _site dist && npx wrangler deploy`.
 - **Local build:** `dpkg-buildpackage -us -uc -b`. It needs `debhelper`, `python3-pip` and network access, because the Python dependencies are vendored at build time.
 
 Runtime dependencies: `python3` (3.13), `python3-pyqt6.qtwebengine`. pyHanko is vendored because it needs cryptography 48 or newer, and Debian 13 ships 43.

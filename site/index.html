@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SignField</title>
+  <meta name="description" content="Check the digital signature on e-Aadhaar, e-PAN, DigiLocker and GST PDFs against the CCA India root, offline, and get a clean verified copy.">
+  <meta property="og:title" content="SignField">
+  <meta property="og:description" content="Validate digitally signed Indian government PDFs against the CCA India root. Files never leave your machine.">
+  <meta name="theme-color" content="#060607">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --base: #060607; --panel: #15191b; --dim: #1e2326; --line: #3a464c;
+      --green: #a7c080; --aqua: #83c092; --fg: #d3c6aa; --muted: #8f9a91;
+      --wash: #2b3a2e; --warn: #dbbc7f; --red: #e67e80; --purple: #d699b6;
+      --brand: "Unbounded", system-ui, sans-serif;
+      --human: "Albert Sans", system-ui, sans-serif;
+      --mono: "JetBrains Mono", ui-monospace, monospace;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--base); color: var(--fg); font: 17px/1.6 var(--human); -webkit-font-smoothing: antialiased; }
+    a { color: var(--green); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .wrap { max-width: 1180px; margin: 0 auto; padding-inline: 24px; }
+    .eyebrow { font: 600 12px/1 var(--mono); letter-spacing: .28em; text-transform: uppercase; color: var(--green); }
+    .muted { color: var(--muted); }
+
+    header { border-bottom: 1px solid var(--line); background: #0d1011; position: sticky; top: 0; z-index: 10; }
+    header .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .logo { display: flex; align-items: center; gap: 12px; color: var(--fg); }
+    .logo:hover { text-decoration: none; }
+    .logo img { width: 34px; height: 34px; }
+    .logo b { font: 800 18px/1 var(--brand); display: block; }
+    .logo small { font: 400 9px/1 var(--mono); letter-spacing: .4em; color: var(--muted); }
+    nav { display: flex; gap: 28px; }
+    nav a { font: 400 12px var(--mono); letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+    nav a:hover { color: var(--fg); text-decoration: none; }
+
+    .hero { padding: 88px 0 56px; display: grid; grid-template-columns: 6fr 5fr; gap: 56px; align-items: center; }
+    h1 { font: 800 clamp(40px, 6.4vw, 76px)/1.02 var(--brand); margin: 18px 0 20px; letter-spacing: -.01em; }
+    h1 em { font-style: normal; color: var(--green); }
+    .lede { font-size: clamp(18px, 2.2vw, 21px); max-width: 600px; color: var(--muted); margin: 0 0 36px; }
+    .install { display: flex; align-items: stretch; max-width: 720px; border: 1px solid var(--line); background: var(--dim); }
+    .install code { flex: 1; padding: 16px 18px; font: 14px var(--mono); color: var(--fg); overflow-x: auto; white-space: nowrap; }
+    .install code::before { content: "$ "; color: var(--green); }
+    .install button { border: 0; border-left: 1px solid var(--line); background: var(--green); color: var(--base); font: 600 13px var(--human); padding: 0 22px; cursor: pointer; }
+    .install button:hover { background: var(--aqua); }
+    .meta { margin-top: 14px; font: 12px var(--mono); color: var(--muted); letter-spacing: .04em; }
+    .meta span + span::before { content: " · "; color: var(--line); }
+
+    /* A static rendering of the app's report card, not a screenshot. */
+    .report { border: 1px solid var(--line); background: linear-gradient(145deg, #1f2629, #171c1e); box-shadow: 0 30px 80px -30px rgba(167, 192, 128, .22); font-size: 14px; }
+    .report .head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+    .report .name { flex: 1; font-weight: 600; overflow-wrap: anywhere; }
+    .pill { padding: 4px 8px; border: 1px solid currentColor; font: 600 10px var(--mono); letter-spacing: .12em; color: var(--green); }
+    .verdict { display: flex; gap: 12px; margin: 16px 18px 6px; padding: 12px 14px; border-left: 3px solid var(--green); background: rgba(6, 6, 7, .45); }
+    .verdict .big { width: 26px; height: 26px; flex: none; display: grid; place-items: center; background: var(--green); color: var(--base); font-weight: 800; }
+    .verdict strong { display: block; }
+    .verdict p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+    .checks { list-style: none; margin: 0; padding: 8px 18px 16px; }
+    .checks li { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(58, 70, 76, .55); }
+    .checks li:last-child { border-bottom: 0; }
+    .checks .ic { width: 20px; height: 20px; flex: none; display: grid; place-items: center; background: var(--green); color: var(--base); font-size: 12px; font-weight: 800; }
+    .checks .note .ic { background: var(--warn); }
+    .checks small { display: block; color: var(--muted); font: 12px var(--mono); }
+
+    section { padding: 72px 0; border-top: 1px solid #14181a; }
+    h2 { font: 800 clamp(26px, 3.6vw, 38px)/1.15 var(--brand); margin: 14px 0 16px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 28px 0 0; }
+    .chip { font: 600 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; padding: 7px 12px; border: 1px solid var(--line); background: var(--wash); color: var(--green); }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); margin-top: 40px; }
+    .card { background: var(--panel); padding: 28px; }
+    .card h3 { font: 600 19px var(--human); margin: 14px 0 8px; color: var(--fg); }
+    .card p { margin: 0; color: var(--muted); font-size: 15px; }
+    .card .eyebrow { font-size: 10px; }
+    .card code { font: 13px var(--mono); color: var(--fg); }
+
+    .feature { display: grid; grid-template-columns: 5fr 7fr; gap: 56px; align-items: center; }
+    .feature p { color: var(--muted); }
+    .swap { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+    .sig { background: var(--panel); padding: 26px 22px; text-align: center; }
+    .sig .box { margin: 16px auto 0; max-width: 240px; padding: 14px; border: 1px dashed var(--line); background: #f4f1ea; color: #222; font: 12px/1.5 var(--human); text-align: left; position: relative; min-height: 96px; }
+    .sig .mark { position: absolute; right: 12px; top: 12px; width: 36px; height: 36px; display: grid; place-items: center; font: 800 26px var(--human); }
+    .sig .q { color: #c9a227; }
+    .sig .t { color: #2f8a3a; }
+    .sig b { display: block; }
+    .note { margin-top: 28px; padding: 18px 22px; border-left: 3px solid var(--green); background: var(--wash); font-size: 15px; }
+
+    .steps { margin: 0; padding: 0; list-style: none; counter-reset: s; }
+    .steps li { counter-increment: s; position: relative; padding: 0 0 16px 38px; font-size: 15px; color: var(--muted); }
+    .steps li::before { content: counter(s); position: absolute; left: 0; top: 1px; width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid var(--line); font: 600 11px var(--mono); color: var(--green); }
+    .steps b { color: var(--fg); font-weight: 600; }
+    .steps code, .note code, p code { font: 13px var(--mono); color: var(--fg); }
+    .verify { margin-top: 28px; border: 1px solid var(--line); background: var(--dim); padding: 16px 18px; font: 13px/1.9 var(--mono); overflow-x: auto; white-space: pre; }
+    details.src { margin-top: 20px; border: 1px solid var(--line); background: var(--panel); }
+    details.src summary { cursor: pointer; padding: 14px 18px; font: 600 13px var(--mono); color: var(--green); }
+    details.src pre { margin: 0; padding: 18px; border-top: 1px solid var(--line); max-height: 520px; overflow: auto; font: 12px/1.55 var(--mono); color: var(--fg); }
+
+    footer { border-top: 1px solid var(--line); padding: 36px 0 56px; font: 12px var(--mono); color: var(--muted); }
+    footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+
+    @media (max-width: 860px) {
+      nav { display: none; }
+      .hero, .feature { grid-template-columns: 1fr; gap: 40px; }
+      .grid { grid-template-columns: 1fr; }
+      .hero { padding-top: 56px; }
+      section { padding: 56px 0; }
+    }
+    @media (max-width: 520px) {
+      .wrap { padding-inline: 16px; }
+      .swap { grid-template-columns: 1fr; }
+      .install { flex-direction: column; }
+      .install code { white-space: normal; word-break: break-all; overflow: visible; }
+      .install button { border-left: 0; border-top: 1px solid var(--line); padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <a class="logo" href="#"><img src="icon.svg" alt=""><span><b>SignField</b><small>THALLIUM 81</small></span></a>
+      <nav>
+        <a href="#checks">Checks</a>
+        <a href="#copy">Verified copy</a>
+        <a href="#install">Install</a>
+        <a href="#script">The script</a>
+        <a href="https://github.com/thallium-os/signfield">Source</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap hero">
+      <div>
+        <div class="eyebrow">PDF signature validator</div>
+        <h1>That “?” on your<br>e-Aadhaar? <em>Check it.</em></h1>
+        <p class="lede">SignField validates digitally signed Indian government PDFs against the CCA India root, on your own machine, and gives you a clean copy with the green tick.</p>
+        <div class="install">
+          <code id="cmd">curl -fsSL https://signfield.thallium81.dev/install.sh | sh</code>
+          <button type="button" class="copy" data-for="cmd">Copy</button>
+        </div>
+        <div class="meta"><span>v@VERSION@</span><span>Debian 13 · amd64</span><span>GPL-3.0</span><span><a href="#script">Read what it does first</a></span></div>
+      </div>
+      <div class="report" role="img" aria-label="Example SignField report: an e-Aadhaar PDF with a valid signature, all five checks passed and a SHA-1 note.">
+        <div class="head"><span class="name">EAadhaar_2026.pdf</span><span class="pill">VALID</span></div>
+        <div class="verdict"><span class="big">✓</span><div><strong>Signature valid</strong><p>e-Aadhaar (UIDAI) · signed 04 Mar 2026, 11:42 IST</p></div></div>
+        <ul class="checks">
+          <li><span class="ic">✓</span><div>Integrity<small>signed bytes unchanged</small></div></li>
+          <li><span class="ic">✓</span><div>Coverage<small>whole file · no later edits</small></div></li>
+          <li><span class="ic">✓</span><div>Chain<small>→ CCA India 2022</small></div></li>
+          <li><span class="ic">✓</span><div>Valid at signing time<small>cert in date on 04 Mar 2026</small></div></li>
+          <li><span class="ic">✓</span><div>Revocation<small>OCSP · good</small></div></li>
+          <li class="note"><span class="ic">!</span><div>Weak hash<small>SHA-1 · common for government signers</small></div></li>
+        </ul>
+      </div>
+    </div>
+
+    <section id="checks">
+      <div class="wrap">
+        <div class="eyebrow">Five checks per signature</div>
+        <h2>Real validation, not a viewer's guess.</h2>
+        <p class="muted" style="max-width:720px">PDF readers show a yellow “?” on most Indian government documents because they don't ship the CCA India roots. SignField does, and checks every signature in the file properly.</p>
+        <div class="chips">
+          <span class="chip">e-Aadhaar</span><span class="chip">e-PAN</span><span class="chip">DigiLocker</span>
+          <span class="chip">GST</span><span class="chip">Form 16 / TRACES</span><span class="chip">e-District</span><span class="chip">Any DSC</span>
+        </div>
+        <div class="grid">
+          <div class="card"><span class="eyebrow">Integrity</span><h3>Bytes unchanged</h3><p>The signed byte range hashes to exactly what the signer signed.</p></div>
+          <div class="card"><span class="eyebrow">Coverage</span><h3>Later edits caught</h3><p>Reports whether the signature covers the whole file, and anything added after signing.</p></div>
+          <div class="card"><span class="eyebrow">Chain</span><h3>Up to CCA India</h3><p>Builds a path to a bundled root: 2011, 2014, 2015 SPL, 2022 and 2022 SPL.</p></div>
+          <div class="card"><span class="eyebrow">Time</span><h3>Valid when signed</h3><p>Judged on the document's own signing date, so an old Aadhaar isn't failed for an expired cert.</p></div>
+          <div class="card"><span class="eyebrow">Revocation</span><h3>OCSP or CRL</h3><p>Asks the certifying authority whether the signer's certificate was revoked.</p></div>
+          <div class="card"><span class="eyebrow">Private</span><h3>Files stay local</h3><p>No upload. The only network traffic is OCSP, CRL and AIA lookups to the CAs.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="copy">
+      <div class="wrap feature">
+        <div>
+          <div class="eyebrow">Verified copy</div>
+          <h2>Swap the “?” for a tick.</h2>
+          <p>For a valid file, SignField builds a flattened copy where the signature box shows a green tick and “Signature valid” instead of “Signature Not Verified”. Handy for portals and people who only look at the box.</p>
+          <div class="note">The copy is <b>not</b> digitally signed. Its Keywords field holds the original's SHA-256, so anyone can match it back. Keep the original for anything that verifies signatures.</div>
+        </div>
+        <div class="swap">
+          <div class="sig"><span class="eyebrow">Original</span><div class="box"><span class="mark q">?</span><b>Signature Not Verified</b>Digitally signed by DS UNIQUE IDENTIFICATION AUTHORITY OF INDIA<br>Date: 2026.03.04 11:42</div></div>
+          <div class="sig"><span class="eyebrow">Verified copy</span><div class="box"><span class="mark t">✓</span><b>Signature valid</b>Digitally signed by DS UNIQUE IDENTIFICATION AUTHORITY OF INDIA<br>Date: 2026.03.04 11:42</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="more">
+      <div class="wrap">
+        <div class="eyebrow">Also</div>
+        <h2>Built for a stack of documents.</h2>
+        <div class="grid">
+          <div class="card"><span class="eyebrow">Batch</span><h3>Drop many at once</h3><p>Drop, choose or paste PDFs; each gets its own report.</p></div>
+          <div class="card"><span class="eyebrow">Preview</span><h3>Side by side</h3><p>The original and the verified copy, in the built-in PDF viewer.</p></div>
+          <div class="card"><span class="eyebrow">Export</span><h3>CSV and JSON</h3><p>Password-protected PDFs work too. Reports export for record-keeping.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="install">
+      <div class="wrap">
+        <div class="eyebrow">Install</div>
+        <h2>One command. Updates through APT.</h2>
+        <p class="muted" style="max-width:720px">For Debian 13 (trixie) on x86_64, including Thallium 81. SignField is tied to Debian 13's Python 3.13 and PyQt6.</p>
+        <div class="install" style="margin-top:28px">
+          <code id="cmd2">curl -fsSL https://signfield.thallium81.dev/install.sh | sh</code>
+          <button type="button" class="copy" data-for="cmd2">Copy</button>
+        </div>
+        <p class="muted" style="margin-top:20px;font-size:15px">Or grab the package directly: <a href="pool/trixie/main/s/signfield/signfield_@VERSION@_amd64.deb">signfield_@VERSION@_amd64.deb</a>, then <code>sudo apt install ./signfield_@VERSION@_amd64.deb</code>.</p>
+      </div>
+    </section>
+
+    <section id="script">
+      <div class="wrap">
+        <div class="eyebrow">Read before you run</div>
+        <h2>What the install script does.</h2>
+        <p class="muted" style="max-width:720px">A short POSIX <code>sh</code> file. Here is everything it does, in order.</p>
+        <ol class="steps" style="max-width:820px;margin-top:32px">
+          <li><b>Checks your system.</b> It stops unless this is Debian 13 on amd64 with APT.</li>
+          <li><b>Asks for your password once</b> via sudo or pkexec, because adding an APT source needs root. Don't pipe it into sudo yourself.</li>
+          <li><b>Downloads the signing key and checks it</b> against a SHA-256 written into the script. On a mismatch it stops and changes nothing.</li>
+          <li><b>Adds one pinned APT source</b> at <code>/etc/apt/sources.list.d/signfield.sources</code>. The pin lets it supply <code>signfield</code> only, never replace another package.</li>
+          <li><b>Installs SignField and stops.</b> No background service. Future versions arrive with your normal <code>apt upgrade</code>.</li>
+        </ol>
+        <div class="verify">curl -fsSLO https://signfield.thallium81.dev/install.sh
+less install.sh
+sh install.sh</div>
+        <details class="src" id="src">
+          <summary>Show the full script served at /install.sh</summary>
+          <pre id="src-body">Loading…</pre>
+        </details>
+        <p class="muted" style="font-size:14px;margin-top:16px">Source: <a href="https://github.com/thallium-os/signfield/blob/main/scripts/install.sh">scripts/install.sh</a>. Archive key <code>BC07 5A23 F742 C83B CF6F 309D 221A 85B5 FA2D 560D</code>.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>SignField · GPL-3.0 · part of <a href="https://thallium81.dev">Thallium 81</a></span>
+      <span><a href="https://github.com/thallium-os/signfield">github.com/thallium-os/signfield</a></span>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelectorAll(".copy").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var t = document.getElementById(b.dataset.for).textContent;
+        (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(
+          function () { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1600); },
+          function () { b.textContent = "Select ⌘C"; });
+      });
+    });
+    // Shows the exact bytes /install.sh serves, not a copy that could drift.
+    document.getElementById("src").addEventListener("toggle", function () {
+      var pre = document.getElementById("src-body");
+      if (!this.open || pre.dataset.loaded) return;
+      fetch("install.sh", { cache: "no-cache" })
+        .then(function (r) { if (!r.ok) throw 0; return r.text(); })
+        .then(function (t) { pre.textContent = t; pre.dataset.loaded = 1; })
+        .catch(function () { pre.textContent = "Could not load it here. Open /install.sh directly."; });
+    });
+  </script>
+</body>
+</html>

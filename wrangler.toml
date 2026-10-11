@@ -1,0 +1,9 @@
+# signfield.thallium81.dev: the page, installer and APT archive, served as
+# Worker static assets. scripts/build-site writes _site/ first.
+name = "signfield-site"
+compatibility_date = "2026-09-01"
+workers_dev = false
+routes = [{ pattern = "signfield.thallium81.dev", custom_domain = true }]
+
+[assets]
+directory = "./_site"

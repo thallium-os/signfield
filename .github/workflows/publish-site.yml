@@ -1,0 +1,59 @@
+name: Publish signfield.thallium81.dev
+
+# The product page, installer and signed APT archive, deployed as Worker
+# static assets. Runs on version tags so the archive only moves on releases.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: signfield-site
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    # trixie, not the runner: the .deb vendors CPython 3.13 wheels.
+    container: debian:trixie
+    steps:
+      - name: Install tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential debhelper python3 python3-pip git ca-certificates \
+            curl apt-utils dpkg-dev gnupg nodejs npm
+
+      - uses: actions/checkout@v4
+
+      - name: Build the .deb
+        run: |
+          dpkg-buildpackage -us -uc -b
+          mkdir -p dist && mv ../signfield_*.deb dist/
+
+      - name: Import signing key
+        env:
+          APT_SIGNING_KEY_B64: ${{ secrets.APT_SIGNING_KEY_B64 }}
+        run: |
+          test -n "$APT_SIGNING_KEY_B64" || { echo "APT_SIGNING_KEY_B64 is not set" >&2; exit 1; }
+          install -d -m 0700 "$RUNNER_TEMP/gnupg"
+          printf '%s' "$APT_SIGNING_KEY_B64" | base64 --decode \
+            | GNUPGHOME="$RUNNER_TEMP/gnupg" gpg --batch --import
+          echo "GNUPGHOME=$RUNNER_TEMP/gnupg" >> "$GITHUB_ENV"
+
+      - name: Build site and archive
+        run: scripts/build-site _site dist
+
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 9d1b2d02094e17e0da5b4a80c375a99f
+        run: npx --yes wrangler@4 deploy
+
+      - name: Verify
+        run: |
+          set -eu
+          curl -fsS https://signfield.thallium81.dev/dists/trixie/InRelease | head -3
+          curl -fsS https://signfield.thallium81.dev/ | grep -q '<title>SignField</title>'
+          curl -fsSI https://signfield.thallium81.dev/install.sh | head -1
